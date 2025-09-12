@@ -1,8 +1,6 @@
 # System Design
 
-Hey, welcome to the course. I hope this course provides a great learning experience.
-
-_This course is also available on my [website](https://karanpratapsingh.com/courses/system-design) and as an ebook on [leanpub](https://leanpub.com/systemdesign). Please leave a ⭐ as motivation if this was helpful!_
+_This course is forked. Original content available on [website](https://karanpratapsingh.com/courses/system-design) and as an ebook on [leanpub](https://leanpub.com/systemdesign).
 
 # Table of contents
 
@@ -87,26 +85,19 @@ _This course is also available on my [website](https://karanpratapsingh.com/cour
 
 # What is system design?
 
-Before we start this course, let's talk about what even is system design.
-
-System design is the process of defining the architecture, interfaces, and data
-for a system that satisfies specific requirements. System design meets the needs
-of your business or organization through coherent and efficient systems. It requires
-a systematic approach to building and engineering systems. A good system design requires
-us to think about everything, from infrastructure all the way down to the data and how it's stored.
+System design is the process of defining the **architecture**, **interfaces**, and **data** for a system that satisfies specific requirements. System design meets the needs of your business or organization through coherent and efficient systems. It requires a **systematic approach** to building and engineering systems. A good system design requires us to think about everything, from infrastructure all the way down to the data and how it's stored.
 
 ## Why is System Design so important?
 
-System design helps us define a solution that meets the business requirements. It is
-one of the earliest decisions we can make when building a system. Often it is essential
-to think from a high level as these decisions are very difficult to correct later. It
-also makes it easier to reason about and manage architectural changes as the system evolves.
+System design helps us define a solution that meets the **business requirements**. It is one of the earliest decisions we can make when building a system. Often it is essential to think from a high level as these decisions are very difficult to correct later. It also makes it easier to reason about and manage architectural changes as the system evolves.
 
 # IP
 
-An IP address is a unique address that identifies a device on the internet or a local network. IP stands for _"Internet Protocol"_, which is the set of rules governing the format of data sent via the internet or local network.
-
-In essence, IP addresses are the identifier that allows information to be sent between devices on a network. They contain location information and make devices accessible for communication. The internet needs a way to differentiate between different computers, routers, and websites. IP addresses provide a way of doing so and form an essential part of how the internet works.
+IP (Internet Protocol) is the fundamental set of rules governing the **format** and **addressing** of data packets for communication across networks, including the internet.
+An IP address is a unique numerical label assigned to each device (e.g., computer, server, router) participating in a computer network that uses the Internet Protocol. Its primary function is to:
+**Identify** a device on the network.
+**Locate** that device, enabling data to be routed to the correct destination.
+In essence, IP addresses are crucial identifiers that allow devices to find and communicate with each other, forming the backbone of all network communication in system design.
 
 ## Versions
 
@@ -126,33 +117,44 @@ This new protocol uses 128-bit alphanumeric hexadecimal notation. This means tha
 
 _Example: `2001:0db8:85a3:0000:0000:8a2e:0370:7334`_
 
-## Types
+## Types of IP Addresses
 
-Let's discuss types of IP addresses:
+IP addresses are categorized based on their scope and how they are assigned:
 
-### Public
+### Public IP Address
 
-A public IP address is an address where one primary address is associated with your whole network. In this type of IP address, each of the connected devices has the same IP address.
+*   **Definition:** A globally unique IP address assigned to a network device that is directly accessible and routable over the public internet.
+*   **Purpose:** It identifies your entire network (e.g., home, office) to the outside world. All devices within your private network share this single public IP address when communicating externally, thanks to Network Address Translation (NAT).
+*   **Use Cases:** Websites, public servers, and the external interface of your router, enabling communication with the global internet.
+*   **Example:** The IP address your Internet Service Provider (ISP) assigns to your home or office router.
 
-_Example: IP address provided to your router by the ISP._
+### Private IP Address
 
-### Private
+*   **Definition:** An IP address assigned to devices within a private network (e.g., your home LAN, an internal corporate network) that is *not* directly routable on the internet.
+*   **Purpose:** To uniquely identify devices *within* a local network, allowing them to communicate with each other. Private IP addresses are reused across different private networks globally without conflict. NAT is used to translate private IPs to a public IP when devices need to access the internet.
+*   **Use Cases:** Computers, smartphones, printers, and IoT devices connected to your home router or within an enterprise's internal network.
+*   **Example:** IP addresses like `192.168.1.10`, `10.0.0.5`, or `172.16.0.20` assigned by your router to your local devices. (These ranges are reserved for private use: `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
 
-A private IP address is a unique IP number assigned to every device that connects to your internet network, which includes devices like computers, tablets, and smartphones, which are used in your household.
+---
 
-_Example: IP addresses generated by your home router for your devices._
+**Relationship between Public and Private IPs (Brief Note):**
+The distinction between Public and Private IPs is critical for understanding network security and resource conservation. **Network Address Translation (NAT)** is the mechanism that allows multiple devices with private IP addresses within a local network to share a single public IP address for internet access, effectively acting as a gateway.
 
-### Static
+---
 
-A static IP address does not change and is one that was manually created, as opposed to having been assigned. These addresses are usually more expensive but are more reliable.
+### Static IP Address
 
-_Example: They are usually used for important things like reliable geo-location services, remote access, server hosting, etc._
+*   **Definition:** An IP address that is permanently assigned and does not change over time. It can be a public or private IP.
+*   **Purpose:** Provides a consistent and reliable network identity, crucial for services that need to be consistently reachable at the same address.
+*   **Mechanism:** Typically manually configured or permanently reserved via DHCP.
+*   **Use Cases:** Web servers, email servers, database servers, remote access VPNs, critical network devices (routers, firewalls), and services requiring stable geo-location.
 
-### Dynamic
+### Dynamic IP Address
 
-A dynamic IP address changes from time to time and is not always the same. It has been assigned by a [Dynamic Host Configuration Protocol (DHCP)](https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol) server. Dynamic IP addresses are the most common type of internet protocol address. They are cheaper to deploy and allow us to reuse IP addresses within a network as needed.
-
-_Example: They are more commonly used for consumer equipment and personal use._
+*   **Definition:** An IP address that is temporarily assigned from a pool of available addresses and can change periodically. It can be a public or private IP.
+*   **Purpose:** Facilitates efficient management and reuse of IP addresses, especially in networks with many transient devices or limited address pools.
+*   **Mechanism:** Assigned automatically by a **DHCP (Dynamic Host Configuration Protocol)** server for a specific lease duration.
+*   **Use Cases:** Most consumer devices (laptops, smartphones), personal internet connections (where the public IP may change), and general-purpose client machines in large networks. It's cost-effective and simplifies network administration.
 
 # OSI Model
 
