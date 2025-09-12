@@ -95,27 +95,31 @@ System design helps us define a solution that meets the **business requirements*
 
 IP (Internet Protocol) is the fundamental set of rules governing the **format** and **addressing** of data packets for communication across networks, including the internet.
 An IP address is a unique numerical label assigned to each device (e.g., computer, server, router) participating in a computer network that uses the Internet Protocol. Its primary function is to:
-**Identify** a device on the network.
-**Locate** that device, enabling data to be routed to the correct destination.
+* **Identify** a device on the network.
+* **Locate** that device, enabling data to be routed to the correct destination.
 In essence, IP addresses are crucial identifiers that allow devices to find and communicate with each other, forming the backbone of all network communication in system design.
 
-## Versions
+---
 
-Now, let's learn about the different versions of IP addresses:
+## Versions of IP Addresses
 
-### IPv4
+The Internet Protocol has evolved through different versions, primarily to address the increasing demand for unique IP addresses.
 
-The original Internet Protocol is IPv4 which uses a 32-bit numeric dot-decimal notation that only allows for around 4 billion IP addresses. Initially, it was more than enough but as internet adoption grew, we needed something better.
+### IPv4 (Internet Protocol Version 4)
 
-_Example: `102.22.192.181`_
+*   **Definition:** The original and currently most widely used version of the Internet Protocol.
+*   **Addressing:** Uses a **32-bit** numeric address scheme, typically represented in **dot-decimal notation** (e.g., `192.168.1.1`).
+*   **Address Space:** Supports approximately **4.3 billion** unique IP addresses.
+*   **Limitation:** Due to the exponential growth of internet-connected devices, IPv4's address space is severely limited and largely exhausted, driving the need for a successor.
 
-### IPv6
+### IPv6 (Internet Protocol Version 6)
 
-IPv6 is a new protocol that was introduced in 1998. Deployment commenced in the mid-2000s and since the internet users have grown exponentially, it is still ongoing.
-
-This new protocol uses 128-bit alphanumeric hexadecimal notation. This means that IPv6 can provide about ~340e+36 IP addresses. That's more than enough to meet the growing demand for years to come.
-
-_Example: `2001:0db8:85a3:0000:0000:8a2e:0370:7334`_
+*   **Definition:** The next-generation Internet Protocol, designed to replace IPv4.
+*   **Addressing:** Uses a **128-bit** alphanumeric address scheme, typically represented in **hexadecimal notation** (e.g., `2001:0db8:85a3:0000:0000:8a2e:0370:7334`).
+*   **Address Space:** Provides an astronomically larger address space, capable of ~**340 undecillion** (3.4 x 10^38) unique addresses, effectively solving the address exhaustion problem.
+*   **Benefits:** Beyond addressing, IPv6 also introduces features for more efficient routing, enhanced security (IPsec built-in), and improved network configuration.
+*   **Deployment:** Introduced in 1998, its global adoption is still ongoing due to the complexity of migrating existing networks.
+*   
 
 ## Types of IP Addresses
 
