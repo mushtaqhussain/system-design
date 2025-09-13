@@ -160,56 +160,76 @@ The distinction between Public and Private IPs is critical for understanding net
 *   **Mechanism:** Assigned automatically by a **DHCP (Dynamic Host Configuration Protocol)** server for a specific lease duration.
 *   **Use Cases:** Most consumer devices (laptops, smartphones), personal internet connections (where the public IP may change), and general-purpose client machines in large networks. It's cost-effective and simplifies network administration.
 
-# OSI Model
+---
 
-The OSI Model is a logical and conceptual model that defines network communication used by systems open to interconnection and communication with other systems. The Open System Interconnection (OSI Model) also defines a logical network and effectively describes computer packet transfer by using various layers of protocols.
+# OSI Model (Open Systems Interconnection Model)
 
-The OSI Model can be seen as a universal language for computer networking. It's based on the concept of splitting up a communication system into seven abstract layers, each one stacked upon the last.
+The **OSI Model** is a conceptual framework that standardizes the functions of a telecommunication or computing system into seven abstract layers. It serves as a universal reference model for understanding how different network components and protocols interact to enable communication.
 
-## Why does the OSI model matter?
+## Why the OSI Model Matters
 
-The Open System Interconnection (OSI) model has defined the common terminology used in networking discussions and documentation. This allows us to take a very complex communications process apart and evaluate its components.
+While modern internet communication primarily uses the **TCP/IP model** (a simpler, four-layer model), the OSI model remains invaluable as an educational and diagnostic tool because it:
 
-While this model is not directly implemented in the TCP/IP networks that are most common today, it can still help us do so much more, such as:
+*   **Provides Standardized Terminology:** Offers a common language for network discussions, documentation, and troubleshooting.
+*   **Simplifies Complex Systems:** Breaks down the intricate process of network communication into manageable, independent layers.
+*   **Facilitates Interoperability:** Guided the development of products that could communicate across different vendors, by defining clear interfaces and responsibilities for each layer.
+*   **Aids Troubleshooting:** Helps pinpoint the exact layer where a network problem might be occurring, streamlining diagnosis.
+*   **Informs Security:** Allows for understanding security vulnerabilities and defenses at each stage of data transmission.
 
-- Make troubleshooting easier and help identify threats across the entire stack.
-- Encourage hardware manufacturers to create networking products that can communicate with each other over the network.
-- Essential for developing a security-first mindset.
-- Separate a complex function into simpler components.
+---
 
-## Layers
+## The Seven Abstraction Layers
 
-The seven abstraction layers of the OSI model can be defined as follows, from top to bottom:
+The OSI model's layers are typically described from top (closer to the user) to bottom (closer to the physical medium). Data generally flows down the layers on the sender's side and up on the receiver's side.
 
 ![osi-model](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/osi-model/osi-model.png)
 
-### Application
+### 7. Application Layer
 
-This is the only layer that directly interacts with data from the user. Software applications like web browsers and email clients rely on the application layer to initiate communication. But it should be made clear that client software applications are not part of the application layer, rather the application layer is responsible for the protocols and data manipulation that the software relies on to present meaningful data to the user. Application layer protocols include HTTP as well as SMTP.
+*   **Primary Responsibility:** Provides network services directly to end-user applications. It's where user interaction with the network begins.
+*   **Functions:** Protocol definition for application-specific communication.
+*   **Examples:** HTTP (web browsing), SMTP (email), FTP (file transfer), DNS.
+*   **Data Unit:** Data (sometimes referred to as "messages").
 
-### Presentation
+### 6. Presentation Layer
 
-The presentation layer is also called the Translation layer. The data from the application layer is extracted here and manipulated as per the required format to transmit over the network. The functions of the presentation layer are translation, encryption/decryption, and compression.
+*   **Primary Responsibility:** Ensures data is in a readable format for the Application layer by translating, encrypting, or compressing it.
+*   **Functions:** Data formatting, character code translation (e.g., ASCII to EBCDIC), encryption/decryption, compression/decompression.
+*   **Data Unit:** Data.
 
-### Session
+### 5. Session Layer
 
-This is the layer responsible for opening and closing communication between the two devices. The time between when the communication is opened and closed is known as the session. The session layer ensures that the session stays open long enough to transfer all the data being exchanged, and then promptly closes the session in order to avoid wasting resources. The session layer also synchronizes data transfer with checkpoints.
+*   **Primary Responsibility:** Establishes, manages, and terminates communication sessions between applications.
+*   **Functions:** Dialogue control (who sends when), synchronization (checkpoints for data transfer), session restoration.
+*   **Data Unit:** Data.
 
-### Transport
+### 4. Transport Layer
 
-The transport layer (also known as layer 4) is responsible for end-to-end communication between the two devices. This includes taking data from the session layer and breaking it up into chunks called segments before sending it to the Network layer (layer 3). It is also responsible for reassembling the segments on the receiving device into data the session layer can consume.
+*   **Primary Responsibility:** Provides reliable and transparent **end-to-end** data transfer between applications on different hosts.
+*   **Functions:** Segmentation (breaking data into smaller units), reassembly, error checking, flow control, port addressing.
+*   **Examples:** TCP (Transmission Control Protocol - reliable, ordered), UDP (User Datagram Protocol - unreliable, fast).
+*   **Data Unit:** Segments (TCP), Datagrams (UDP).
 
-### Network
+### 3. Network Layer
 
-The network layer is responsible for facilitating data transfer between two different networks. The network layer breaks up segments from the transport layer into smaller units, called packets, on the sender's device, and reassembles these packets on the receiving device. The network layer also finds the best physical path for the data to reach its destination this is known as routing. If the two devices communicating are on the same network, then the network layer is unnecessary.
+*   **Primary Responsibility:** Facilitates logical addressing and **routing** of data packets between different networks (inter-network communication).
+*   **Functions:** Logical addressing (IP addresses), routing (determining the best path).
+*   **Examples:** IP (Internet Protocol).
+*   **Data Unit:** Packets.
 
-### Data Link
+### 2. Data Link Layer
 
-The data link layer is very similar to the network layer, except the data link layer facilitates data transfer between two devices on the same network. The data link layer takes packets from the network layer and breaks them into smaller pieces called frames.
+*   **Primary Responsibility:** Provides reliable data transfer between two directly connected devices on the **same local network** (intra-network communication).
+*   **Functions:** Physical addressing (MAC addresses), error detection and correction for local link, framing, media access control.
+*   **Examples:** Ethernet, Wi-Fi (802.11).
+*   **Data Unit:** Frames.
 
-### Physical
+### 1. Physical Layer
 
-This layer includes the physical equipment involved in the data transfer, such as the cables and switches. This is also the layer where the data gets converted into a bit stream, which is a string of 1s and 0s. The physical layer of both devices must also agree on a signal convention so that the 1s can be distinguished from the 0s on both devices.
+*   **Primary Responsibility:** Defines the electrical, mechanical, procedural, and functional specifications for activating, maintaining, and deactivating the physical link.
+*   **Functions:** Transmission of raw bit streams over the physical medium (cables, radio waves, optical fiber). Defines voltage levels, data rates.
+*   **Examples:** Ethernet cables (Cat 5e, Cat 6), Fiber Optic cables, Wi-Fi radio waves.
+*   **Data Unit:** Bits (1s and 0s).
 
 # TCP and UDP
 
