@@ -767,138 +767,204 @@ Clustering is foundational to modern distributed systems:
 *   **Big Data Processing:** Frameworks like Apache Hadoop and Spark run on clusters to process vast datasets.
 *   **High-Performance Computing (HPC):** Supercomputing environments leverage massive clusters for scientific research and complex simulations.
 
+---
+
 # Caching
 
 _"There are only two hard things in Computer Science: cache invalidation and naming things." - Phil Karlton_
 
-![caching](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/caching/caching.png)
+A **cache** is a high-speed data storage layer that stores a subset of data (typically transiently) so that future requests for that data can be served faster than retrieving it from its primary, slower storage location (e.g., a database, disk). Caches trade capacity for speed.
 
-A cache's primary purpose is to increase data retrieval performance by reducing the need to access the underlying slower storage layer. Trading off capacity for speed, a cache typically stores a subset of data transiently, in contrast to databases whose data is usually complete and durable.
+Caches leverage the **locality of reference** principle: recently accessed data is likely to be accessed again soon (temporal locality), and data near recently accessed data is also likely to be accessed (spatial locality).
 
-Caches take advantage of the locality of reference principle _"recently requested data is likely to be requested again"._
+---
 
-## Caching and Memory
+## Core Caching Concepts
 
-Like a computer's memory, a cache is a compact, fast-performing memory that stores data in a hierarchy of levels, starting at level one, and progressing from there sequentially. They are labeled as L1, L2, L3, and so on. A cache also gets written if requested, such as when there has been an update and new content needs to be saved to the cache, replacing the older content that was saved.
+### Cache Hit and Cache Miss
 
-No matter whether the cache is read or written, it's done one block at a time. Each block also has a tag that includes the location where the data was stored in the cache. When data is requested from the cache, a search occurs through the tags to find the specific content that's needed in level one (L1) of the memory. If the correct data isn't found, more searches are conducted in L2.
+*   **Cache Hit:** The requested data is successfully found and served from the cache. This is the desired outcome.
+*   **Cache Miss:** The requested data is *not* found in the cache. The system must then retrieve the data from the slower primary data store, and typically, it's then placed in the cache for future requests.
 
-If the data isn't found there, searches are continued in L3, then L4, and so on until it has been found, then, it's read and loaded. If the data isn't found in the cache at all, then it's written into it for quick retrieval the next time.
+### Cache Hierarchy (Conceptual)
 
-## Cache hit and Cache miss
+Caches often exist in multiple layers, forming a hierarchy based on their proximity to the user and their speed/capacity trade-offs. For example, a web request might involve:
+1.  **Browser Cache:** On the client's device.
+2.  **CDN Cache:** Distributed globally.
+3.  **Application Cache:** Within the application server's memory.
+4.  **Distributed Cache:** A shared, dedicated cache service.
+5.  **Database Cache:** Built into the database system.
 
-### Cache hit
+---
 
-A cache hit describes the situation where content is successfully served from the cache. The tags are searched in the memory rapidly, and when the data is found and read, it's considered a cache hit.
+## Cache Invalidation (Write Strategies)
 
-**Cold, Warm, and Hot Caches**
+Managing cache consistency when the primary data changes is a critical challenge. These strategies dictate how data is written to the cache and the primary store:
 
-A cache hit can also be described as cold, warm, or hot. In each of these, the speed at which the data is read is described.
+### 1. Write-Through Cache
 
-A hot cache is an instance where data was read from the memory at the _fastest_ possible rate. This happens when the data is retrieved from L1.
+Data is written simultaneously to both the cache and the primary data store. The write operation is confirmed only after both writes complete.
 
-A cold cache is the _slowest_ possible rate for data to be read, though, it's still successful so it's still considered a cache hit. The data is just found lower in the memory hierarchy such as in L3, or lower.
+```
++--------+     +--------+     +---------+
+| Client |---->| Cache  |---->| Database|
++--------+     |        |<----|         |
+               +--------+     +---------+
+                 (Write to both, confirm after both)
+```
 
-A warm cache is used to describe data that's found in L2 or L3. It's not as fast as a hot cache, but it's still faster than a cold cache. Generally, calling a cache warm is used to express that it's slower and closer to a cold cache than a hot one.
+*   **Pros:** Data consistency between cache and store is ensured.
+*   **Cons:** Higher write latency, as the operation waits for two writes to complete.
 
-### Cache miss
+### 2. Write-Around Cache
 
-A cache miss refers to the instance when the memory is searched, and the data isn't found. When this happens, the content is transferred and written into the cache.
+Data is written directly to the primary data store, bypassing the cache entirely.
 
-## Cache Invalidation
+```
++--------+     +--------+     +---------+
+| Client |---->| Cache  |     | Database|
+|        |     |        |---->|         |
+|        |     |<-------|     |         |
+|        |     | (Read miss)  |         |
+|        |     |        |<----|         |
+|        |     +--------+     +---------+
+|        |     (Writes bypass cache, reads fetch from DB on miss)
+```
 
-Cache invalidation is a process where the computer system declares the cache entries as invalid and removes or replaces them. If the data is modified, it should be invalidated in the cache, if not, this can cause inconsistent application behavior. There are three kinds of caching systems:
+*   **Pros:** Reduces latency for write operations; avoids filling cache with data unlikely to be re-read.
+*   **Cons:** New data will not be in the cache immediately, leading to a cache miss on the first read. Potentially high read latency for recently written data.
 
-### Write-through cache
+### 3. Write-Back Cache (or Write-Behind)
 
-![write-through-cache](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/caching/write-through-cache.png)
+Data is written only to the cache. The write operation is confirmed to the client immediately. The cache then asynchronously writes the data to the primary data store.
 
-Data is written into the cache and the corresponding database simultaneously.
+```
++--------+     +--------+     +---------+
+| Client |---->| Cache  |     | Database|
+|        |     |        |-----| (Async) |
+|        |<----|        |     |         |
++--------+     +--------+     +---------+
+                 (Write to cache, confirm. Cache syncs to DB later)
+```
 
-**Pro**: Fast retrieval, complete data consistency between cache and storage.
+*   **Pros:** Very low write latency and high throughput for write-intensive applications.
+*   **Cons:** Risk of data loss if the cache fails before data is synchronized to the primary store. Requires robust cache replication for durability.
 
-**Con**: Higher latency for write operations.
+---
 
-### Write-around cache
+## Cache Eviction Policies
 
-![write-around-cache](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/caching/write-around-cache.png)
+When a cache reaches its capacity, items must be removed. Common policies:
 
-Where write directly goes to the database or permanent storage, bypassing the cache.
+*   **Least Recently Used (LRU):** Discards the item that has not been accessed for the longest time. (Most common and effective).
+*   **Least Frequently Used (LFU):** Discards the item with the lowest access count.
+*   **First In First Out (FIFO):** Evicts the oldest item inserted.
+*   **Random Replacement (RR):** Randomly selects an item for eviction.
 
-**Pro**: This may reduce latency.
+---
 
-**Con**: It increases cache misses because the cache system has to read the information from the database in case of a cache miss. As a result, this can lead to higher read latency in the case of applications that write and re-read the information quickly. Read happen from slower back-end storage and experiences higher latency.
+## Cache Deployment Topologies
 
-### Write-back cache
+### 1. Local / In-Memory Cache
 
-![write-back-cache](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/caching/write-back-cache.png)
+*   **Description:** A cache residing within a single application instance's memory.
+*   **Pros:** Extremely fast access (no network overhead).
+*   **Cons:** Limited by single server memory, data is lost on application restart, difficult to keep consistent across multiple application instances.
 
-Where the write is only done to the caching layer and the write is confirmed as soon as the write to the cache completes. The cache then asynchronously syncs this write to the database.
+### 2. Distributed Cache (Shared / Global Cache)
 
-**Pro**: This would lead to reduced latency and high throughput for write-intensive applications.
+A system that pools the memory of multiple networked computers into a single, logical in-memory data store. Application nodes access this shared cache over the network. "Global Cache" often refers to this shared, centralized distributed cache.
 
-**Con**: There is a risk of data loss in case the caching layer crashes. We can improve this by having more than one replica acknowledging the write in the cache.
+```
++----------+      +------------------+      +---------+
+| App Node 1 |---->|                  |      |         |
++----------+      | Distributed Cache|<---->| Database|
++----------+      |                  |      |         |
+| App Node 2 |---->| (e.g., Redis)    |      +---------+
++----------+      +------------------+
+```
 
-## Eviction policies
+*   **Pros:** Scales beyond single-machine memory, shared by all application instances (improving consistency), provides high availability and fault tolerance (if replicated).
+*   **Cons:** Adds network latency, requires separate infrastructure and management.
 
-Following are some of the most common cache eviction policies:
+---
 
-- **First In First Out (FIFO)**: The cache evicts the first block accessed first without any regard to how often or how many times it was accessed before.
-- **Last In First Out (LIFO)**: The cache evicts the block accessed most recently first without any regard to how often or how many times it was accessed before.
-- **Least Recently Used (LRU)**: Discards the least recently used items first.
-- **Most Recently Used (MRU)**: Discards, in contrast to LRU, the most recently used items first.
-- **Least Frequently Used (LFU)**: Counts how often an item is needed. Those that are used least often are discarded first.
-- **Random Replacement (RR)**: Randomly selects a candidate item and discards it to make space when necessary.
+## Common Use Cases for Caching
 
-## Distributed Cache
+*   **Database Caching:** Storing frequently queried results to reduce database load.
+*   **Content Delivery Network (CDN):** Caching static and dynamic content geographically closer to users.
+*   **API Caching:** Storing responses from APIs to reduce redundant computations and external service calls.
+*   **DNS Caching:** Storing DNS lookup results to speed up domain name resolution.
+*   **Session Caching:** Storing user session data for faster retrieval and shared state.
 
-![distributed-cache](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/caching/distributed-cache.png)
+## When Not to Use Caching
 
-A distributed cache is a system that pools together the random-access memory (RAM) of multiple networked computers into a single in-memory data store used as a data cache to provide fast access to data. While most caches are traditionally in one physical server or hardware component, a distributed cache can grow beyond the memory limits of a single computer by linking together multiple computers.
+*   **High Volatility:** Data changes too frequently, making cached data quickly stale.
+*   **Low Repetition:** Requests for data are rarely repeated (cache hits are infrequent).
+*   **Small Data Sets:** Primary data store is already fast enough for the scale.
+*   **Strict Consistency:** Even slight data staleness is unacceptable.
 
-## Global Cache
+*Important Note: A cache is typically transient storage. Data in a cache is not guaranteed to be durable and should always be re-retrievable from a persistent primary data store.*
 
-![global-cache](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/caching/global-cache.png)
+---
 
-As the name suggests, we will have a single shared cache that all the application nodes will use. When the requested data is not found in the global cache, it's the responsibility of the cache to find out the missing piece of data from the underlying data store.
+## Advantages of Caching
 
-## Use cases
+*   **Improved Performance:** Faster data retrieval, lower latency.
+*   **Reduced Backend Load:** Less pressure on primary data stores (e.g., databases).
+*   **Reduced Network Cost/Bandwidth:** Especially with CDNs.
+*   **Increased Read Throughput:** Can handle more read requests per second.
 
-Caching can have many real-world use cases such as:
+---
 
-- Database Caching
-- Content Delivery Network (CDN)
-- Domain Name System (DNS) Caching
-- API Caching
+## Popular Caching Technologies
 
-**When not to use caching?**
+*   [Redis](https://redis.io) (Versatile in-memory data store)
+*   [Memcached](https://memcached.org) (Simple, high-performance object caching)
+*   [Amazon ElastiCache](https://aws.amazon.com/elasticache) (Managed Redis and Memcached)
+*   [Aerospike](https://aerospike.com) (High-performance NoSQL database and cache)
 
-Let's also look at some scenarios where we should not use cache:
+---
 
-- Caching isn't helpful when it takes just as long to access the cache as it does to access the primary data store.
-- Caching doesn't work as well when requests have low repetition (higher randomness), because caching performance comes from repeated memory access patterns.
-- Caching isn't helpful when the data changes frequently, as the cached version gets out of sync, and the primary data store must be accessed every time.
+## Redis vs. Memcached
 
-_It's important to note that a cache should not be used as permanent data storage. They are almost always implemented in volatile memory because it is faster, and thus should be considered transient._
+Both Redis and Memcached are popular **in-memory key-value stores** primarily used for caching. However, they differ significantly in their feature sets, use cases, and complexity.
 
-## Advantages
+| Feature               | Memcached (Simple, High-Performance Object Caching)                                      | Redis (Versatile In-Memory Data Store)                                                   |
+| :-------------------- | :--------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------- |
+| **Data Structures**   | Stores only **strings/binary data** (flat key-value pairs).                               | Supports a **rich variety of data structures**: Strings, Hashes, Lists, Sets, Sorted Sets, Bitmaps, HyperLogLogs, Geospatial indexes. |
+| **Persistence**       | **No persistence.** Data is lost if the server restarts or crashes.                       | **Optional persistence.** Can save data to disk (RDB snapshots, AOF log) for durability. |
+| **Replication / HA**  | **No built-in replication or high availability.** Relies on client-side sharding and application logic for redundancy. | **Built-in master-replica (leader-follower) replication.** Supports Sentinel for automatic failover and Redis Cluster for sharding. |
+| **Atomic Operations** | Limited: Increment/Decrement for integers.                                               | Richer set: Atomic operations on all data structures, transactions (multi/exec), Lua scripting for custom atomic operations. |
+| **Memory Management** | Simpler. Allocates fixed chunks.                                                         | More sophisticated. Can evict data using various policies (LRU, LFU, etc.).             |
+| **Pub/Sub**           | No.                                                                                      | **Yes.** Built-in Publish/Subscribe messaging.                                          |
+| **Lua Scripting**     | No.                                                                                      | **Yes.** Allows for complex, atomic operations on the server side.                       |
+| **Complexity**        | Simpler, lighter-weight, fewer features.                                                 | More complex, richer feature set, more configuration options.                             |
+| **CPU Usage**         | Typically single-threaded per instance for command execution, but can scale with multiple instances/cores. | Primarily single-threaded per instance for command execution, but background tasks (e.g., persistence) run on separate threads. |
+| **Ideal Use Cases**   | Pure, high-performance **object caching** for simple key-value lookups (e.g., database query results, HTML fragments). | **Advanced caching** (e.g., session store, full-page cache), real-time leaderboards, message queues, rate limiting, pub/sub messaging, geospatial indexing. |
 
-Below are some advantages of caching:
 
-- Improves performance
-- Reduce latency
-- Reduce load on the database
-- Reduce network cost
-- Increase Read Throughput
+**In essence:**
 
-## Examples
+*   **Memcached** is your go-to for **raw speed and simplicity** when you just need to cache simple key-value pairs without any fancy data manipulation or durability.
+*   **Redis** is the more **versatile and feature-rich** option. It excels when you need more than just caching—like complex data structures, persistence, high availability, or real-time messaging capabilities.
 
-Here are some commonly used technologies for caching:
+### Redis and Memcached
 
-- [Redis](https://redis.io)
-- [Memcached](https://memcached.org)
-- [Amazon Elasticache](https://aws.amazon.com/elasticache)
-- [Aerospike](https://aerospike.com)
+1.  **Open Source:** Their source code is publicly available, allowing anyone to inspect, modify, and distribute it.
+2.  **Free:** They are free to use, without licensing costs, for both personal and commercial projects.
+
+While companies like Redis Inc. offer commercial versions, support, and managed cloud services for Redis (which come with costs), the core open-source Redis software itself remains free.
+
+#### As Standalone Software Applications or Packages
+
+*   **Standalone Server Processes:** They are individual server processes (or daemons) that run on an operating system (Linux, Windows, macOS).
+*   **Installed via Package Managers:** On Linux systems, you install them using package managers (e.g., `apt install redis-server` or `yum install memcached`).
+*   **Client-Server Model:** Your application code (the "client") then connects to these running Redis or Memcached servers over a network (even if it's `localhost`) using specific client libraries.
+*   **Not Built-in:** They are not built directly into the operating system or a programming language's standard library. You explicitly add them to your system infrastructure.
+*   **Managed Services:** In cloud environments (like AWS ElastiCache, Azure Cache for Redis, Google Cloud Memorystore), the cloud provider manages the deployment, scaling, and maintenance of these server applications for you, but they are still fundamentally separate software services.
+
+---
 
 # Content Delivery Network (CDN)
 
