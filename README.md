@@ -943,12 +943,6 @@ Both Redis and Memcached are popular **in-memory key-value stores** primarily us
 | **CPU Usage**         | Typically single-threaded per instance for command execution, but can scale with multiple instances/cores. | Primarily single-threaded per instance for command execution, but background tasks (e.g., persistence) run on separate threads. |
 | **Ideal Use Cases**   | Pure, high-performance **object caching** for simple key-value lookups (e.g., database query results, HTML fragments). | **Advanced caching** (e.g., session store, full-page cache), real-time leaderboards, message queues, rate limiting, pub/sub messaging, geospatial indexing. |
 
-
-**In essence:**
-
-*   **Memcached** is your go-to for **raw speed and simplicity** when you just need to cache simple key-value pairs without any fancy data manipulation or durability.
-*   **Redis** is the more **versatile and feature-rich** option. It excels when you need more than just caching—like complex data structures, persistence, high availability, or real-time messaging capabilities.
-
 ### Redis and Memcached
 
 1.  **Open Source:** Their source code is publicly available, allowing anyone to inspect, modify, and distribute it.
@@ -968,339 +962,551 @@ While companies like Redis Inc. offer commercial versions, support, and managed 
 
 # Content Delivery Network (CDN)
 
-A content delivery network (CDN) is a geographically distributed group of servers that work together to provide fast delivery of internet content. Generally, static files such as HTML/CSS/JS, photos, and videos are served from CDN.
+A **Content Delivery Network (CDN)** is a geographically distributed network of proxy servers (called **edge servers** or **Points of Presence - PoPs**) that work together to provide fast delivery of internet content. CDNs cache content closer to users, primarily static assets like HTML, CSS, JavaScript files, images, and videos.
 
-![cdn-map](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/content-delivery-network/cdn-map.png)
+### Why Use a CDN?
 
-## Why use a CDN?
+CDNs are crucial for modern web applications due to several key benefits:
 
-Content Delivery Network (CDN) increases content availability and redundancy while reducing bandwidth costs and improving security. Serving content from CDNs can significantly improve performance as users receive content from data centers close to them and our servers do not have to serve requests that the CDN fulfills.
+*   **Improved Performance (Lower Latency):** Delivers content from edge servers geographically closer to the user, significantly reducing load times.
+*   **Increased Availability & Redundancy:** Distributes content across many locations, providing fault tolerance if an origin server or a specific edge location goes offline.
+*   **Reduced Origin Server Load:** Offloads traffic from the main (origin) servers, allowing them to handle dynamic requests more efficiently.
+*   **Reduced Bandwidth Costs:** Often, CDN bandwidth is cheaper than origin server bandwidth, leading to cost savings.
+*   **Enhanced Security:** Many CDNs offer built-in DDoS protection and Web Application Firewall (WAF) services at the edge.
 
-## How does a CDN work?
+---
 
-![cdn](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/content-delivery-network/cdn.png)
+## How a CDN Works
 
-In a CDN, the origin server contains the original versions of the content while the edge servers are numerous and distributed across various locations around the world.
+A CDN works by caching copies of content from an **origin server** (where the original, authoritative version of the content resides) onto its distributed **edge servers**.
 
-To minimize the distance between the visitors and the website's server, a CDN stores a cached version of its content in multiple geographical locations known as edge locations. Each edge location contains several caching servers responsible for content delivery to visitors within its proximity.
+```
+                           +-----------+
+                           |  Internet |
+                           +-----+-----+
+                                 |
+           +-------------------------------------+
+           |                                     |
+           |             CDN Global Network      |
+           |                                     |
+    +------v------+                 +------v------+
+    | User in NYC |                 | User in LON |
+    +------+------+                 +------+------+
+           |                             |
+           | (Request)                   | (Request)
+           v                             v
+    +-------------+                 +-------------+
+    | CDN Edge (NY) |               | CDN Edge (LDN)|
+    | (Cache Check) |---------------| (Cache Check) |
+    +------+------+                 +------+------+
+           | Cache Hit             | Cache Hit
+           |                       |
+           v                       v
+     (Content Delivered)     (Content Delivered)
 
-Once the static assets are cached on all the CDN servers for a particular location, all subsequent website visitor requests for static assets will be delivered from these edge servers instead of the origin, thus reducing the origin load and improving scalability.
 
-For example, when someone in the UK requests our website which might be hosted in the USA, they will be served from the closest edge location such as the London edge location. This is much quicker than having the visitor make a complete request to the origin server which will increase the latency.
+    If CDN Edge has a MISS:
+    +-------------+       +-------------------+
+    | CDN Edge (NY)|------>| Origin Server (USA)|
+    | (Cache MISS) |<------| (Serves Content)  |
+    +-------------+       +-------------------+
+        (Pulls content to cache, then serves to user)
+```
 
-## Types
+1.  **Initial Request:** A user requests content (e.g., `image.jpg`). The DNS record for `image.jpg` points to the CDN.
+2.  **CDN Routing:** The CDN routes the request to the nearest available **edge server** based on geographic proximity.
+3.  **Cache Check:** The edge server checks if it has a cached copy of the content.
+    *   **Cache Hit:** If found, the edge server immediately serves the content to the user.
+    *   **Cache Miss:** If not found (or if the cached version is stale based on TTL), the edge server requests the content from the **origin server**.
+4.  **Origin Fetch & Cache:** The origin server sends the content back to the edge server. The edge server caches this content and then serves it to the user.
+5.  **Subsequent Requests:** Future requests from users near that edge location will now be served directly from the cached copy, dramatically reducing latency.
 
-CDNs are generally divided into two types:
+---
 
-### Push CDNs
+## Types of CDNs (Content Ingestion)
 
-Push CDNs receive new content whenever changes occur on the server. We take full responsibility for providing content, uploading directly to the CDN, and rewriting URLs to point to the CDN. We can configure when content expires and when it is updated. Content is uploaded only when it is new or changed, minimizing traffic, but maximizing storage.
+The way content is populated on CDN edge servers typically falls into two categories:
 
-Sites with a small amount of traffic or sites with content that isn't often updated work well with push CDNs. Content is placed on the CDNs once, instead of being re-pulled at regular intervals.
+### 1. Pull CDNs (On-Demand Caching)
 
-### Pull CDNs
+*   **Mechanism:** When an edge server receives a request for content it doesn't have, it "pulls" (fetches) that content from the origin server, caches it, and then delivers it to the client. Subsequent requests are served from the cache.
+```
++--------+     +-------------+     +--------------+
+| Client |---->| CDN Edge LB |---->| Origin Server|
+|        |<----| (Cache MISS)|<----| (Serve data) |
+|        |     |             |     |              |
+|        |     | (Cache data)|<----|              |
+|        |     +-------------+     +--------------+
+```
+*   **Pros:** Requires less maintenance for content updates; only popular content is cached, saving storage.
+*   **Cons:** First request for new or less popular content will experience a cache miss and higher latency.
+*   **Best For:** Websites with heavy traffic, frequently updated content, or large content libraries where only a subset is popular.
 
-In a Pull CDN situation, the cache is updated based on request. When the client sends a request that requires static assets to be fetched from the CDN if the CDN doesn't have it, then it will fetch the newly updated assets from the origin server and populate its cache with this new asset, and then send this new cached asset to the user.
+### 2. Push CDNs (Pre-Populated Caching)
 
-Contrary to the Push CDN, this requires less maintenance because cache updates on CDN nodes are performed based on requests from the client to the origin server. Sites with heavy traffic work well with pull CDNs, as traffic is spread out more evenly with only recently-requested content remaining on the CDN.
+*   **Mechanism:** The content owner explicitly "pushes" (uploads) content directly to the CDN's storage infrastructure. The CDN then proactively distributes this content to its edge servers.
+```
++---------------+     +-------------+
+| Origin Server |---->| CDN Storage |------>| CDN Edge |
+| (Uploads data)|     | (Pushes Data) |      | (Pre-filled)|
++---------------+     +-------------+      +------------+
+```
+*   **Pros:** Guarantees content is available at the edge with no initial cache misses; good for static, rarely changing content.
+*   **Cons:** Requires manual upload or integration; higher storage costs if large amounts of rarely accessed content are pushed.
+*   **Best For:** Websites with less traffic, content that is rarely updated, or critical files that must have zero initial latency.
 
-## Disadvantages
+---
 
-As we all know good things come with extra costs, so let's discuss some disadvantages of CDNs:
+## Disadvantages of CDNs
 
-- **Extra charges**: It can be expensive to use a CDN, especially for high-traffic services.
-- **Restrictions**: Some organizations and countries have blocked the domains or IP addresses of popular CDNs.
-- **Location**: If most of our audience is located in a country where the CDN has no servers, the data on our website may have to travel further than without using any CDN.
+While highly beneficial, CDNs also have considerations:
 
-## Examples
+*   **Cost:** Can be expensive for very high traffic volumes or specific features.
+*   **Invalidation Complexity:** Cache invalidation (ensuring users get the latest content) can be tricky.
+*   **Geographical Gaps:** If an audience is heavily concentrated in a region with few CDN edge servers, performance gains might be minimal.
+*   **Security Concerns:** Placing content on a third-party CDN means trusting their security posture.
 
-Here are some widely used CDNs:
+---
 
-- [Amazon CloudFront](https://aws.amazon.com/cloudfront)
-- [Google Cloud CDN](https://cloud.google.com/cdn)
-- [Cloudflare CDN](https://www.cloudflare.com/cdn)
-- [Fastly](https://www.fastly.com/products/cdn)
+## Examples of Popular CDNs
+
+*   [Amazon CloudFront](https://aws.amazon.com/cloudfront)
+*   [Google Cloud CDN](https://cloud.google.com/cdn)
+*   [Cloudflare CDN](https://www.cloudflare.com/cdn)
+*   [Fastly](https://www.fastly.com/products/cdn)
+
+---
 
 # Proxy
 
-A proxy server is an intermediary piece of hardware/software sitting between the client and the backend server. It receives requests from clients and relays them to the origin servers. Typically, proxies are used to filter requests, log requests, or sometimes transform requests (by adding/removing headers, encrypting/decrypting, or compression).
+A **proxy server** is an intermediary server that sits between a client and a backend server. It intercepts client requests, performs various operations (like filtering, logging, transforming), and then forwards them to the intended destination.
 
-## Types
+## Types of Proxies
 
-There are two types of proxies:
+Proxies are broadly categorized by the direction of traffic they mediate:
 
-### Forward Proxy
+### 1. Forward Proxy
 
-A forward proxy, often called a proxy, proxy server, or web proxy is a server that sits in front of a group of client machines. When those computers make requests to sites and services on the internet, the proxy server intercepts those requests and then communicates with web servers on behalf of those clients, like a middleman.
+A **forward proxy** (or just "proxy server") sits in front of clients (e.g., within a corporate network) and relays their requests to internet resources. It acts on behalf of the client.
 
-![forward-proxy](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/proxy/forward-proxy.png)
+```
++--------+     +--------------+     +---------+
+| Client |---->| Forward Proxy|---->| Internet|---->| Backend |
++--------+     | (Client-side)|     +---------+     | Server  |
+               +--------------+                     +---------+
+```
 
-**Advantages**
+*   **Purpose:** To manage outbound traffic from a group of clients.
+*   **Key Uses:**
+    *   **Access Control:** Blocks access to certain websites or content.
+    *   **Anonymity:** Hides the client's IP address from the backend server.
+    *   **Geo-unblocking:** Allows access to geo-restricted content by appearing to originate from the proxy's location.
+    *   **Caching:** Caches web content to speed up repeated client requests.
+*   **Considerations:** Can track user activity, adds a point of control, configuration required on client-side or network.
 
-Here are some advantages of a forward proxy:
+### 2. Reverse Proxy
 
-- Block access to certain content
-- Allows access to [geo-restricted](https://en.wikipedia.org/wiki/Geo-blocking) content
-- Provides anonymity
-- Avoid other browsing restrictions
+A **reverse proxy** sits in front of one or more backend (origin) servers and intercepts client requests destined for those servers. It acts on behalf of the server(s).
 
-Although proxies provide the benefits of anonymity, they can still track our personal information. Setup and maintenance of a proxy server can be costly and requires configurations.
+```
++--------+     +---------------+     +--------------+
+| Client |---->| Reverse Proxy |---->| Backend Server 1|
+|        |     | (Server-side) |     +--------------+
+|        |     |               |---->| Backend Server 2|
++--------+     +---------------+     +--------------+
+```
 
-### Reverse Proxy
+*   **Purpose:** To manage inbound traffic to a group of servers, enhancing performance, security, and scalability.
+*   **Key Uses:**
+    *   **Load Balancing:** Distributes client requests across multiple backend servers to prevent overload and ensure high availability.
+    *   **Security (WAF):** Provides an additional layer of defense, shielding backend servers from direct internet exposure and filtering malicious traffic.
+    *   **SSL/TLS Termination:** Handles SSL/TLS encryption/decryption, offloading this CPU-intensive task from backend servers.
+    *   **Caching:** Caches static or frequently accessed content to reduce load on backend servers and improve response times.
+    *   **Compression:** Compresses server responses before sending them to the client.
+    *   **URL Rewriting:** Modifies request URLs before forwarding to backends.
+*   **Considerations:** Can become a single point of failure (mitigated by deploying in an HA cluster), adds complexity to the architecture.
 
-A reverse proxy is a server that sits in front of one or more web servers, intercepting requests from clients. When clients send requests to the origin server of a website, those requests are intercepted by the reverse proxy server.
+---
 
-The difference between a forward and reverse proxy is subtle but important. A simplified way to sum it up would be to say that a forward proxy sits in front of a client and ensures that no origin server ever communicates directly with that specific client. On the other hand, a reverse proxy sits in front of an origin server and ensures that no client ever communicates directly with that origin server.
+## Load Balancer vs. Reverse Proxy
 
-![reverse-proxy](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/proxy/reverse-proxy.png)
+The terms "load balancer" and "reverse proxy" are often used interchangeably because a load balancer is essentially a specialized type of reverse proxy.
 
-Introducing reverse proxy results in increased complexity. A single reverse proxy is a single point of failure, configuring multiple reverse proxies (i.e. a failover) further increases complexity.
+*   **Reverse Proxy:** A broad category of server that sits in front of other servers, primarily acting as an intermediary for client requests. Its core function is to proxy requests, offering features like security, caching, SSL termination, and *potentially* load balancing. A reverse proxy can be used even with a single backend server.
+*   **Load Balancer:** A specific type of reverse proxy whose *primary purpose* is to distribute network traffic across multiple backend servers to optimize resource utilization, maximize throughput, and ensure high availability. A load balancer implicitly requires multiple backend servers to distribute traffic amongst.
 
-**Advantages**
+**Relationship:** All load balancers are reverse proxies, but not all reverse proxies are load balancers. A reverse proxy can perform load balancing, but it also offers a wider range of functionalities.
 
-Here are some advantages of using a reverse proxy:
+---
 
-- Improved security
-- Caching
-- SSL encryption
-- Load balancing
-- Scalability and flexibility
+## Examples of Proxy Technologies
 
-## Load balancer vs Reverse Proxy
+*   [Nginx](https://www.nginx.com) (Commonly used as a reverse proxy, load balancer, and static file server)
+*   [HAProxy](http://www.haproxy.org) (High-performance, open-source load balancer and reverse proxy)
+*   [Traefik](https://doc.traefik.io/traefik) (Modern HTTP reverse proxy and load balancer that integrates with microservices)
+*   [Envoy Proxy](https://www.envoyproxy.io) (Open-source edge and service proxy, often used in service mesh architectures)
 
-Wait, isn't reverse proxy similar to a load balancer? Well, no as a load balancer is useful when we have multiple servers. Often, load balancers route traffic to a set of servers serving the same function, while reverse proxies can be useful even with just one web server or application server. A reverse proxy can also act as a load balancer but not the other way around.
-
-## Examples
-
-Below are some commonly used proxy technologies:
-
-- [Nginx](https://www.nginx.com)
-- [HAProxy](http://www.haproxy.org)
-- [Traefik](https://doc.traefik.io/traefik)
-- [Envoy](https://www.envoyproxy.io)
+---
 
 # Availability
 
-Availability is the time a system remains operational to perform its required function in a specific period. It is a simple measure of the percentage of time that a system, service, or machine remains operational under normal conditions.
+**Availability** is a measure of how consistently a system or service remains operational and accessible to perform its required function during a specific period. It is typically expressed as a percentage of uptime.
 
-## The Nine's of availability
+## The "Nines" of Availability
 
-Availability is often quantified by uptime (or downtime) as a percentage of time the service is available. It is generally measured in the number of 9s.
-
-$$
-Availability = \frac{Uptime}{(Uptime + Downtime)}
-$$
-
-If availability is 99.00% available, it is said to have "2 nines" of availability, and if it is 99.9%, it is called "3 nines", and so on.
-
-| Availability (Percent)   | Downtime (Year)    | Downtime (Month)  | Downtime (Week)    |
-| ------------------------ | ------------------ | ----------------- | ------------------ |
-| 90% (one nine)           | 36.53 days         | 72 hours          | 16.8 hours         |
-| 99% (two nines)          | 3.65 days          | 7.20 hours        | 1.68 hours         |
-| 99.9% (three nines)      | 8.77 hours         | 43.8 minutes      | 10.1 minutes       |
-| 99.99% (four nines)      | 52.6 minutes       | 4.32 minutes      | 1.01 minutes       |
-| 99.999% (five nines)     | 5.25 minutes       | 25.9 seconds      | 6.05 seconds       |
-| 99.9999% (six nines)     | 31.56 seconds      | 2.59 seconds      | 604.8 milliseconds |
-| 99.99999% (seven nines)  | 3.15 seconds       | 263 milliseconds  | 60.5 milliseconds  |
-| 99.999999% (eight nines) | 315.6 milliseconds | 26.3 milliseconds | 6 milliseconds     |
-| 99.9999999% (nine nines) | 31.6 milliseconds  | 2.6 milliseconds  | 0.6 milliseconds   |
-
-## Availability in Sequence vs Parallel
-
-If a service consists of multiple components prone to failure, the service's overall availability depends on whether the components are in sequence or in parallel.
-
-### Sequence
-
-Overall availability decreases when two components are in sequence.
+Availability is commonly quantified using "nines," representing uptime percentages and their corresponding allowable downtime.
 
 $$
-Availability \space (Total) = Availability \space (Foo) * Availability \space (Bar)
+\text{Availability} = \frac{\text{Uptime}}{(\text{Uptime} + \text{Downtime})}
 $$
 
-For example, if both `Foo` and `Bar` each had 99.9% availability, their total availability in sequence would be 99.8%.
+| Availability (Percent) | Downtime (Year)    | Downtime (Month)  | Downtime (Week)    |
+| :--------------------- | :----------------- | :---------------- | :----------------- |
+| 90% (one nine)         | 36.53 days         | 72 hours          | 16.8 hours         |
+| 99% (two nines)        | 3.65 days          | 7.20 hours        | 1.68 hours         |
+| 99.9% (three nines)    | 8.77 hours         | 43.8 minutes      | 10.1 minutes       |
+| 99.99% (four nines)    | 52.6 minutes       | 4.32 minutes      | 1.01 minutes       |
+| 99.999% (five nines)   | 5.25 minutes       | 25.9 seconds      | 6.05 seconds       |
+| 99.9999% (six nines)   | 31.56 seconds      | 2.59 seconds      | 604.8 milliseconds |
+| 99.99999% (seven nines)| 3.15 seconds       | 263 milliseconds  | 60.5 milliseconds  |
+| 99.999999% (eight nines)| 315.6 milliseconds| 26.3 milliseconds | 6 milliseconds     |
+| 99.9999999% (nine nines)| 31.6 milliseconds | 2.6 milliseconds  | 0.6 milliseconds   |
 
-### Parallel
+---
 
-Overall availability increases when two components are in parallel.
+## Availability in System Design
+
+The overall availability of a system composed of multiple components depends on their arrangement:
+
+### 1. Components in Sequence (Serial)
+
+If components are arranged in sequence, the failure of *any* single component leads to the failure of the entire system.
 
 $$
-Availability \space (Total) = 1 - (1 - Availability \space (Foo)) * (1 - Availability \space (Bar))
+\text{Availability (Total)} = \text{Availability (Comp1)} \times \text{Availability (Comp2)} \times \ldots
 $$
 
-For example, if both `Foo` and `Bar` each had 99.9% availability, their total availability in parallel would be 99.9999%.
+**Example:** If Component A has 99.9% availability and Component B has 99.9% availability, their combined availability in sequence is 0.999 * 0.999 = 0.998001 (approx. 99.8%).
 
-## Availability vs Reliability
+```
++--------+   +--------+   +--------+
+| Client |-->| Comp A |-->| Comp B |-->| Backend |
++--------+   +--------+   +--------+
+             (Both must be up for the system to be available)
+```
 
-If a system is reliable, it is available. However, if it is available, it is not necessarily reliable. In other words, high reliability contributes to high availability, but it is possible to achieve high availability even with an unreliable system.
+### 2. Components in Parallel (Redundant)
 
-## High availability vs Fault Tolerance
+If components are arranged in parallel (with redundancy), the system remains available as long as *at least one* component is operational.
 
-Both high availability and fault tolerance apply to methods for providing high uptime levels. However, they accomplish the objective differently.
+$$
+\text{Availability (Total)} = 1 - (1 - \text{Availability (Comp1)}) \times (1 - \text{Availability (Comp2)}) \times \ldots
+$$
 
-A fault-tolerant system has no service interruption but a significantly higher cost, while a highly available system has minimal service interruption. Fault-tolerance requires full hardware redundancy as if the main system fails, with no loss in uptime, another system should take over.
+**Example:** If Component A has 99.9% availability and Component B (a redundant backup) has 99.9% availability, their combined availability in parallel is 1 - (1 - 0.999) * (1 - 0.999) = 1 - 0.001 * 0.001 = 1 - 0.000001 = 0.999999 (approx. 99.9999%).
+
+```
+          +--------+
+      /-->| Comp A |----\
++--------+            \   v   +---------+
+| Client |---> Load Balancer ---> System  |
++--------+            /   ^   +---------+
+      \-->| Comp B |----/
+          +--------+
+          (At least one must be up for the system to be available)
+```
+
+---
+
+## Availability vs. Reliability
+
+*   **Availability:** Refers to the *operational state* of a system (is it up and accessible?). A system can be highly available even if it's occasionally unreliable.
+*   **Reliability:** Refers to the *consistency and correctness* of a system's performance over time (does it function as expected without errors?). A reliable system is almost always available.
+
+**Analogy:** A car that starts every time (available) but frequently breaks down while driving (unreliable). A reliable car starts every time and runs smoothly without breaking down.
+
+## High Availability vs. Fault Tolerance
+
+Both aim for high uptime, but differ in scope and cost:
+
+*   **High Availability (HA):** Achieves minimal service interruption (e.g., seconds or minutes of downtime) through redundancy and automatic failover. It's designed for quick recovery from failures, often with some graceful degradation or brief service impact during failover. HA systems typically have redundant components but might have a brief service interruption during a switch.
+*   **Fault Tolerance (FT):** Aims for *zero* service interruption during failures. It involves complete hardware and software redundancy, where a backup system takes over instantly without any loss of state or active connections. FT is significantly more complex and expensive, essentially mirroring every component.
+
+---
 
 # Scalability
 
-Scalability is the measure of how well a system responds to changes by adding or removing resources to meet demands.
+**Scalability** is a system's ability to efficiently handle an increasing amount of work or demand by adding or removing resources. It measures how well a system can grow to meet future requirements.
 
-![scalability](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-I/scalability/scalability.png)
+## Types of Scaling
 
-Let's discuss different types of scaling:
+### 1. Vertical Scaling (Scaling Up)
 
-## Vertical scaling
+**Vertical scaling** involves increasing the capacity of a single existing machine or server. This means adding more CPU, RAM, or faster storage to an individual server.
 
-Vertical scaling (also known as scaling up) expands a system's scalability by adding more power to an existing machine. In other words, vertical scaling refers to improving an application's capability via increasing hardware capacity.
+```
+       +-----------------+
+       | App Server (S)  |
+       | CPU: 4 cores    |
+       | RAM: 16 GB      |
+       +-----------------+
+              (Upgrade)
+                   v
+       +-----------------+
+       | App Server (L)  |
+       | CPU: 16 cores   |
+       | RAM: 64 GB      |
+       +-----------------+
+```
 
-### Advantages
+*   **Advantages:**
+    *   Simple to implement and manage for single-server systems.
+    *   Maintains data consistency more easily as there's only one data store.
+*   **Disadvantages:**
+    *   **Limits:** Finite limits to how much a single machine can be upgraded.
+    *   **Downtime:** Requires downtime during upgrades.
+    *   **Single Point of Failure (SPOF):** The single, powerful machine remains a SPOF.
+    *   **Cost:** Powerful machines become disproportionately expensive.
 
-- Simple to implement
-- Easier to manage
-- Data consistent
+### 2. Horizontal Scaling (Scaling Out)
 
-### Disadvantages
+**Horizontal scaling** involves adding more machines or instances to a system, distributing the workload across them. This means deploying multiple identical servers behind a load balancer.
 
-- Risk of high downtime
-- Harder to upgrade
-- Can be a single point of failure
+```
++--------+     +-------------+     +--------------+
+| Client |---->| Load Balancer |---->| App Server 1 |
++--------+     |             |     +--------------+
+               |             |---->| App Server 2 |
+               +-------------+     +--------------+
+                                   | App Server 3 | (Add more servers as needed)
+                                   +--------------+
+```
 
-## Horizontal scaling
+*   **Advantages:**
+    *   **Increased Redundancy & Fault Tolerance:** Failure of one server doesn't take down the entire service.
+    *   **Near-Limitless Scale:** Can add virtually unlimited servers to handle demand.
+    *   **Flexibility:** Can scale up or down dynamically based on demand (autoscaling).
+    *   **Cost-Effective:** Often uses commodity hardware, which is cheaper.
+*   **Disadvantages:**
+    *   **Increased Complexity:** Managing multiple servers, load balancing, distributed state, and data consistency becomes challenging.
+    *   **Data Consistency:** Maintaining consistent data across multiple instances (especially for databases) requires complex distributed system patterns.
+    *   **Inter-service Communication:** Increased network traffic and latency for communication between scaled components.
+    *   **Statelessness:** Applications often need to be designed to be "stateless" or use external state management (e.g., distributed caches) to scale horizontally effectively.
 
-Horizontal scaling (also known as scaling out) expands a system's scale by adding more machines. It improves the performance of the server by adding more instances to the existing pool of servers, allowing the load to be distributed more evenly.
-
-### Advantages
-
-- Increased redundancy
-- Better fault tolerance
-- Flexible and efficient
-- Easier to upgrade
-
-### Disadvantages
-
-- Increased complexity
-- Data inconsistency
-- Increased load on downstream services
+---
 
 # Storage
 
-Storage is a mechanism that enables a system to retain data, either temporarily or permanently. This topic is mostly skipped over in the context of system design, however, it is important to have a basic understanding of some common types of storage techniques that can help us fine-tune our storage components. Let's discuss some important storage concepts:
+**Storage** is the fundamental mechanism that enables a system to retain data, either temporarily or permanently. In system design, understanding storage types and strategies is crucial for optimizing performance, cost, and data durability.
 
-## RAID
+## RAID (Redundant Array of Independent Disks)
 
-RAID (Redundant Array of Independent Disks) is a way of storing the same data on multiple hard disks or solid-state drives (SSDs) to protect data in the case of a drive failure.
+**RAID** is a data virtualization technology that combines multiple physical disk drives into a single logical unit to improve data redundancy, performance, or both.
 
-There are different RAID levels, however, and not all have the goal of providing redundancy. Let's discuss some commonly used RAID levels:
+### Common RAID Levels:
 
-- **RAID 0**: Also known as striping, data is split evenly across all the drives in the array.
-- **RAID 1**: Also known as mirroring, at least two drives contains the exact copy of a set of data. If a drive fails, others will still work.
-- **RAID 5**: Striping with parity. Requires the use of at least 3 drives, striping the data across multiple drives like RAID 0, but also has a parity distributed across the drives.
-- **RAID 6**: Striping with double parity. RAID 6 is like RAID 5, but the parity data are written to two drives.
-- **RAID 10**: Combines striping plus mirroring from RAID 0 and RAID 1. It provides security by mirroring all data on secondary drives while using striping across each set of drives to speed up data transfers.
+*   **RAID 0 (Striping)**
+    *   **Description:** Data is split into blocks and written across multiple drives. Offers performance improvement but **no redundancy**.
+    *   **Diagram:**
+        ```
+        Data Block A   Data Block B   Data Block C
+        +----------+   +----------+   +----------+
+        |  Drive 1 |<--|----------|<--|  Drive 2 |<--|----------|<--|  Drive 3 |
+        +----------+   +----------+   +----------+
+        ```
+*   **RAID 1 (Mirroring)**
+    *   **Description:** Data is simultaneously written to at least two drives, creating an exact copy. Provides **high redundancy** at the cost of capacity.
+    *   **Diagram:**
+        ```
+        Data Block A
+        +----------+   +----------+
+        |  Drive 1 |<--| (Copy)   |-->|  Drive 2 |
+        +----------+   +----------+
+        ```
+*   **RAID 5 (Striping with Parity)**
+    *   **Description:** Data is striped across drives, and parity information (for fault recovery) is distributed among them. Requires at least 3 drives, tolerates **single-drive failure**.
+    *   **Diagram:**
+        ```
+        Data Block A   Parity P1B   Data Block B
+        +----------+   +----------+   +----------+
+        |  Drive 1 |<--|  Drive 2 |<--|  Drive 3 |
+        +----------+   +----------+   +----------+
+        ```
+*   **RAID 6 (Striping with Double Parity)**
+    *   **Description:** Similar to RAID 5 but writes two independent parity blocks. Requires at least 4 drives, tolerates **two-drive failures**.
+*   **RAID 10 (RAID 1+0: Striping and Mirroring)**
+    *   **Description:** Combines RAID 1 (mirroring for redundancy) with RAID 0 (striping for performance). Provides both **high performance and high redundancy** but is costly due to 50% capacity loss. Requires at least 4 drives.
 
-### Comparison
-
-Let's compare all the features of different RAID levels:
+### RAID Level Comparison:
 
 | Features             | RAID 0   | RAID 1               | RAID 5               | RAID 6                      | RAID 10                                  |
-| -------------------- | -------- | -------------------- | -------------------- | --------------------------- | ---------------------------------------- |
+| :------------------- | :------- | :------------------- | :------------------- | :-------------------------- | :--------------------------------------- |
 | Description          | Striping | Mirroring            | Striping with Parity | Striping with double parity | Striping and Mirroring                   |
 | Minimum Disks        | 2        | 2                    | 3                    | 4                           | 4                                        |
 | Read Performance     | High     | High                 | High                 | High                        | High                                     |
-| Write Performance    | High     | Medium               | High                 | High                        | Medium                                   |
-| Cost                 | Low      | High                 | Low                  | Low                         | High                                     |
+| Write Performance    | High     | Medium               | Medium               | Medium                      | High                                     |
 | Fault Tolerance      | None     | Single-drive failure | Single-drive failure | Two-drive failure           | Up to one disk failure in each sub-array |
-| Capacity Utilization | 100%     | 50%                  | 67%-94%              | 50%-80%                     | 50%                                      |
+| Capacity Utilization | 100%     | 50%                  | (N-1)/N              | (N-2)/N                     | 50%                                      |
+
+---
 
 ## Volumes
 
-Volume is a fixed amount of storage on a disk or tape. The term volume is often used as a synonym for the storage itself, but it is possible for a single disk to contain more than one volume or a volume to span more than one disk.
+A **volume** represents a logical unit of storage, often carved out from one or more physical disks. A single disk can contain multiple volumes, or a volume can span multiple disks. It's the unit of storage that operating systems typically interact with.
 
-## File storage
+---
 
-File storage is a solution to store data as files and present it to its final users as a hierarchical directories structure. The main advantage is to provide a user-friendly solution to store and retrieve files. To locate a file in file storage, the complete path of the file is required. It is economical and easily structured and is usually found on hard drives, which means that they appear exactly the same for the user and on the hard drive.
+## Storage Types
 
-Example: [Amazon EFS](https://aws.amazon.com/efs), [Azure files](https://azure.microsoft.com/en-in/services/storage/files), [Google Cloud Filestore](https://cloud.google.com/filestore), etc.
+Different applications and data types require different storage characteristics:
 
-## Block storage
+### 1. File Storage (Network File System - NFS)
 
-Block storage divides data into blocks (chunks) and stores them as separate pieces. Each block of data is given a unique identifier, which allows a storage system to place the smaller pieces of data wherever it is most convenient.
+*   **Description:** Stores data as a hierarchical structure of files and folders, accessible via a file system interface (e.g., SMB, NFS). Clients see data as they would on a local drive.
+*   **Characteristics:** User-friendly, good for shared access to files, often used for content collaboration.
+*   **Diagram:**
+    ```
+    +--------+     +-------------+     +-------------------+
+    | Client |---->| File Server |---->| /home/user/docs/  |
+    +--------+     |             |     | /share/images/    |
+                   +-------------+     +-------------------+
+    ```
+*   **Examples:** Network Attached Storage (NAS), Amazon EFS, Azure Files, Google Cloud Filestore.
 
-Block storage also decouples data from user environments, allowing that data to be spread across multiple environments. This creates multiple paths to the data and allows the user to retrieve it quickly. When a user or application requests data from a block storage system, the underlying storage system reassembles the data blocks and presents the data to the user or application
+### 2. Block Storage
 
-Example: [Amazon EBS](https://aws.amazon.com/ebs).
+*   **Description:** Divides data into fixed-size blocks, each with a unique identifier. The operating system treats these blocks as raw, unformatted disk drives, providing low-level, high-performance access.
+*   **Characteristics:** Ideal for databases, operating system volumes, and applications requiring fine-grained control over storage.
+*   **Diagram:**
+    ```
+    +--------+     +-------------+     +---------------------+
+    | Client |---->| OS Disk I/O |---->| Block Storage (RAW) |
+    +--------+     | (Mounts)    |     | [Block 1] [Block 2] |
+                   +-------------+     | [Block 3] [Block 4] |
+                                       +---------------------+
+    ```
+*   **Examples:** Amazon EBS, Azure Managed Disks, Google Persistent Disk.
 
-## Object Storage
+### 3. Object Storage
 
-Object storage, which is also known as object-based storage, breaks data files up into pieces called objects. It then stores those objects in a single repository, which can be spread out across multiple networked systems.
+*   **Description:** Stores data as self-contained units called "objects" within a flat, non-hierarchical structure. Each object includes the data itself, unique identifier, and metadata. Accessed via APIs (e.g., HTTP/S).
+*   **Characteristics:** Highly scalable, durable, cost-effective for large amounts of unstructured data (images, videos, backups).
+*   **Diagram:**
+    ```
+    +--------+     +-------------+     +---------------------+
+    | Client |---->| Object Store|---->| Bucket A: Object ID |
+    +--------+     | (HTTP API)  |     | Bucket B: Object ID |
+                   +-------------+     | (Flat structure)    |
+                                       +---------------------+
+    ```
+*   **Examples:** Amazon S3, Azure Blob Storage, Google Cloud Storage.
 
-Example: [Amazon S3](https://aws.amazon.com/s3), [Azure Blob Storage](https://azure.microsoft.com/en-in/services/storage/blobs), [Google Cloud Storage](https://cloud.google.com/storage), etc.
+---
 
-## NAS
+## NAS (Network Attached Storage)
 
-A NAS (Network Attached Storage) is a storage device connected to a network that allows storage and retrieval of data from a central location for authorized network users. NAS devices are flexible, meaning that as we need additional storage, we can add to what we have. It's faster, less expensive, and provides all the benefits of a public cloud on-site, giving us complete control.
+A **NAS** is a dedicated file storage device connected to a network, allowing multiple users and client devices to access and share data from a central location. It typically provides file-level access (File Storage).
 
-## HDFS
+```
+          +-------+
+          | Router|
+          +---+---+
+              |
++-------+   +---+---+   +-------+
+| PC 1  |---| Network |---| PC 2  |
++-------+   +---+---+   +-------+
+                |
+              +-----+
+              | NAS | (File Storage)
+              +-----+
+```
 
-The Hadoop Distributed File System (HDFS) is a distributed file system designed to run on commodity hardware. HDFS is highly fault-tolerant and is designed to be deployed on low-cost hardware. HDFS provides high throughput access to application data and is suitable for applications that have large data sets. It has many similarities with existing distributed file systems.
+---
 
-HDFS is designed to reliably store very large files across machines in a large cluster. It stores each file as a sequence of blocks, all blocks in a file except the last block are the same size. The blocks of a file are replicated for fault tolerance.
+## HDFS (Hadoop Distributed File System)
+
+**HDFS** is a distributed file system designed to store and manage very large files across clusters of commodity hardware. It's a core component of the Apache Hadoop ecosystem, optimized for high-throughput access to large datasets, providing high fault tolerance through data replication.
+
+---
 
 # Databases and DBMS
 
 ## What is a Database?
 
-A database is an organized collection of structured information, or data, typically stored electronically in a computer system. A database is usually controlled by a Database Management System (DBMS). Together, the data and the DBMS, along with the applications that are associated with them, are referred to as a database system, often shortened to just database.
+A **database** is an organized collection of structured information or data, typically stored and accessed electronically from a computer system. It serves as a persistent store for an application's or system's data.
 
-## What is DBMS?
+## What is a DBMS?
 
-A database typically requires a comprehensive database software program known as a Database Management System (DBMS). A DBMS serves as an interface between the database and its end-users or programs, allowing users to retrieve, update, and manage how the information is organized and optimized. A DBMS also facilitates oversight and control of databases, enabling a variety of administrative operations such as performance monitoring, tuning, and backup and recovery.
+A **Database Management System (DBMS)** is a software system that facilitates the creation, retrieval, update, and management of databases. It acts as an interface between users/applications and the raw data, providing tools for data organization, optimization, security, performance monitoring, and backup/recovery.
 
-## Components
+## Database Components
 
-Here are some common components found across different databases:
+Common structural components found across many database types:
 
-### Schema
+```
++------------------------------------------------+
+| Database (e.g., "CustomerDB")                  |
+| +--------------------------------------------+ |
+| | Schema (e.g., "public")                    | |
+| | +----------------------------------------+ | |
+| | | Table (e.g., "Users")                  | | |
+| | | +----------+-----------+------------+ | | |
+| | | | Column   | Column    | Column     | | | |
+| | | | (id: INT)| (name:TEXT)| (email:TEXT)| | | |
+| | | +----------+-----------+------------+ | | |
+| | | | Row 1    | 1         | Alice      | | | |
+| | | |          | 2         | Bob        | | | |
+| | | |          | 3         | Charlie    | | | |
+| | | +----------+-----------+------------+ | | |
+| | +----------------------------------------+ | |
+| +--------------------------------------------+ |
++------------------------------------------------+
+```
 
-The role of a schema is to define the shape of a data structure, and specify what kinds of data can go where. Schemas can be strictly enforced across the entire database, loosely enforced on part of the database, or they might not exist at all.
+*   **Schema:** Defines the logical structure of the database, including tables, fields, relationships, and data types. Can be strict or flexible.
+*   **Table:** A collection of related data organized into rows and columns (in relational databases).
+*   **Column:** A specific attribute or field in a table, holding a set of data values of a particular type (e.g., text, numbers, dates).
+*   **Row:** A single record within a table, containing a complete set of values for each column.
 
-### Table
+---
 
-Each table contains various columns just like in a spreadsheet. A table can have as meager as two columns and upwards of a hundred or more columns, depending upon the kind of information being put in the table.
+## Types of Databases
 
-### Column
+Databases are primarily categorized by their data models:
 
-A column contains a set of data values of a particular type, one value for each row of the database. A column may contain text values, numbers, enums, timestamps, etc.
+*   **SQL (Relational Databases):**
+    *   **Model:** Tabular, structured data with predefined schemas and relationships.
+    *   **Language:** Uses Structured Query Language (SQL).
+    *   **Properties:** ACID (Atomicity, Consistency, Isolation, Durability) guarantees, strong consistency.
+    *   **Examples:** MySQL, PostgreSQL, Oracle, SQL Server.
+*   **NoSQL (Non-relational Databases):**
+    *   **Model:** Flexible schemas, designed for specific data models and use cases, can handle unstructured or semi-structured data.
+    *   **Properties:** Often prioritize availability and partition tolerance (BASE - Basically Available, Soft state, Eventually consistent) over strict consistency.
+    *   **Types:**
+        *   **Document:** Stores data as flexible, semi-structured documents (e.g., JSON). (e.g., MongoDB, Couchbase)
+        *   **Key-Value:** Stores data as simple key-value pairs. (e.g., Redis, DynamoDB)
+        *   **Graph:** Stores data as nodes and edges, representing relationships. (e.g., Neo4j, Amazon Neptune)
+        *   **Time-Series:** Optimized for storing and querying time-stamped data. (e.g., InfluxDB, TimescaleDB)
+        *   **Wide-Column:** Stores data in tables with flexible columns that can vary per row. (e.g., Cassandra, HBase)
+        *   **Multi-Model:** Supports multiple data models. (e.g., ArangoDB)
 
-### Row
+*(Note: SQL and NoSQL databases, including their comparison, will be discussed in dedicated sections.)*
 
-Data in a table is recorded in rows. There can be thousands or millions of rows in a table having any particular information.
+---
 
-## Types
+## Challenges with Databases at Scale
 
-![database-types](https://raw.githubusercontent.com/karanpratapsingh/portfolio/master/public/static/courses/system-design/chapter-II/databases-and-dbms/database-types.png)
+Scaling and managing databases, especially in distributed systems, presents several challenges:
 
-Below are different types of databases:
+*   **Data Volume & Velocity:** Handling explosive growth in data volume and the rate at which it's generated.
+*   **Data Security & Privacy:** Protecting sensitive data from breaches while ensuring appropriate access.
+*   **Performance & Latency:** Maintaining real-time access and responsiveness as demand increases.
+*   **Management Overhead:** Increased complexity and resource costs for maintenance, monitoring, and administration.
+*   **Scalability Limits:** Designing systems that can grow effectively to meet unpredictable future demand, avoiding bottlenecks.
+*   **Consistency & Durability:** Ensuring data integrity and availability across distributed deployments.
+*   **Data Residency & Sovereignty:** Meeting regulatory requirements for where data is stored and processed.
 
-- **[SQL](https://karanpratapsingh.com/courses/system-design/sql-databases)**
-- **[NoSQL](https://karanpratapsingh.com/courses/system-design/nosql-databases)**
-  - Document
-  - Key-value
-  - Graph
-  - Timeseries
-  - Wide column
-  - Multi-model
-
-SQL and NoSQL databases are broad topics and will be discussed separately in [SQL databases](https://karanpratapsingh.com/courses/system-design/sql-databases) and [NoSQL databases](https://karanpratapsingh.com/courses/system-design/nosql-databases). Learn how they compare to each other in [SQL vs NoSQL databases](https://karanpratapsingh.com/courses/system-design/sql-vs-nosql-databases).
-
-## Challenges
-
-Some common challenges faced while running databases at scale:
-
-- **Absorbing significant increases in data volume**: The explosion of data coming in from sensors, connected machines, and dozens of other sources.
-- **Ensuring data security**: Data breaches are happening everywhere these days, it's more important than ever to ensure that data is secure but also easily accessible to users.
-- **Keeping up with demand**: Companies need real-time access to their data to support timely decision-making and to take advantage of new opportunities.
-- **Managing and maintaining the database and infrastructure**: As databases become more complex and data volumes grow, companies are faced with the expense of hiring additional talent to manage their databases.
-- **Removing limits on scalability**: A business needs to grow if it's going to survive, and its data management must grow along with it. But it's very difficult to predict how much capacity the company will need, particularly with on-premises databases.
-- **Ensuring data residency, data sovereignty, or latency requirements**: Some organizations have use cases that are better suited to run on-premises. In those cases, engineered systems that are pre-configured and pre-optimized for running the database are ideal.
+---
 
 # SQL databases
 
